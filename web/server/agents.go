@@ -107,6 +107,24 @@ func (l *Launcher) buildNamedAgent(name string) (*agent.Agent, error) {
 	return agent.New(&cfgCopy)
 }
 
+// reloadAgent rebuilds the default agent (used by the main Chat and WhatsApp)
+// from the active named agent when one is set and valid, otherwise from the
+// generic default. The caller must hold l.mu (write lock).
+func (l *Launcher) reloadAgent() {
+	if name := l.cfg.ActiveAgent; name != "" {
+		if ag, err := l.buildNamedAgent(name); err == nil {
+			l.agent = ag
+			return
+		}
+		// Active agent missing/disabled/unbuildable: fall through to default.
+	}
+	if ag, err := agent.New(l.cfg); err == nil {
+		l.agent = ag
+	} else {
+		l.agent = nil
+	}
+}
+
 // handleAgents serves GET (list + form choices) and POST (create/update).
 func (l *Launcher) handleAgents(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
@@ -127,6 +145,7 @@ func (l *Launcher) handleAgents(w http.ResponseWriter, r *http.Request) {
 			"agents":  agents,
 			"models":  models,
 			"default": l.cfg.Agents.Defaults.ModelName,
+			"active":  l.cfg.ActiveAgent,
 		})
 
 	case http.MethodPost:
@@ -162,6 +181,11 @@ func (l *Launcher) handleAgents(w http.ResponseWriter, r *http.Request) {
 		if err := l.saveAgents(agents); err != nil {
 			writeErr(w, http.StatusInternalServerError, "save: "+err.Error())
 			return
+		}
+		// If the edited agent is the active one, rebuild so Chat/WhatsApp pick
+		// up its new prompt/model immediately.
+		if strings.EqualFold(l.cfg.ActiveAgent, a.Name) {
+			l.reloadAgent()
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "agent": a})
 
@@ -222,5 +246,43 @@ func (l *Launcher) handleAgentByName(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "save: "+err.Error())
 		return
 	}
+	// Deleting the active agent reverts Chat/WhatsApp to the generic default.
+	if strings.EqualFold(l.cfg.ActiveAgent, name) {
+		l.cfg.ActiveAgent = ""
+		_ = l.cfg.Save()
+		l.reloadAgent()
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleActiveAgent (POST /api/agents/active) sets which named agent the main
+// Chat and WhatsApp answer as. An empty name reverts to the generic default.
+func (l *Launcher) handleActiveAgent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeErr(w, http.StatusMethodNotAllowed, "POST only")
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, "bad request: "+err.Error())
+		return
+	}
+	name := strings.TrimSpace(body.Name)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if name != "" {
+		if _, ok := l.findAgent(name); !ok {
+			writeErr(w, http.StatusNotFound, "no such agent")
+			return
+		}
+	}
+	l.cfg.ActiveAgent = name
+	if err := l.cfg.Save(); err != nil {
+		writeErr(w, http.StatusInternalServerError, "save: "+err.Error())
+		return
+	}
+	l.reloadAgent()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "active": name})
 }

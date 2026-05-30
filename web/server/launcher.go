@@ -84,6 +84,8 @@ func New(addr string, public bool, cfg *config.Config) (*Launcher, error) {
 	if err := l.loadAuth(); err != nil {
 		return nil, err
 	}
+	// Apply the active named agent (if configured) so Chat/WhatsApp answer as it.
+	l.reloadAgent()
 	// Best-effort WhatsApp manager (whatsmeow). A failure to open the session
 	// store must not block startup; WhatsApp simply stays unavailable.
 	if mgr, err := whatsapp.New(context.Background(), filepath.Join(l.authDir, "whatsapp.db"), l.agentReply); err == nil {
@@ -258,6 +260,7 @@ func (l *Launcher) routes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/credentials", l.requireAuth(l.handleCredentials))
 	mux.HandleFunc("/api/credentials/", l.requireAuth(l.handleCredentialByName))
 	mux.HandleFunc("/api/agents", l.requireAuth(l.handleAgents))
+	mux.HandleFunc("/api/agents/active", l.requireAuth(l.handleActiveAgent))
 	mux.HandleFunc("/api/agents/", l.requireAuth(l.handleAgentByName))
 	mux.HandleFunc("/api/chat/stream", l.requireAuth(l.handleChatStream))
 	mux.HandleFunc("/api/whatsapp/status", l.requireAuth(l.handleWhatsAppStatus))

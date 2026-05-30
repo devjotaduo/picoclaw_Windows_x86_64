@@ -168,10 +168,14 @@ input {
 .agents-form-actions { display: flex; gap: 14px; align-items: center; margin-top: 16px; }
 .link.danger { color: #e57; }
 
-/* Agent list footer: model tag + "open page" link */
-.agent-item-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; gap: 8px; }
+/* Agent list footer: model tag + activate + "open page" link */
+.agent-item-foot { display: flex; align-items: center; flex-wrap: wrap; margin-top: 4px; gap: 6px 10px; }
+.agent-item-foot .agent-item-tag { margin-right: auto; }
+.agent-item-foot .link { font-size: 11px; padding: 0; }
 .agent-open-link { font-size: 11px; color: var(--accent); text-decoration: none; white-space: nowrap; }
 .agent-open-link:hover { text-decoration: underline; }
+.agent-active-badge { margin-left: 8px; font-size: 10px; font-weight: 600; color: var(--ok);
+  border: 1px solid var(--ok); border-radius: 999px; padding: 1px 7px; vertical-align: middle; }
 
 /* Isolated agent page (/a/<name>) */
 .isolated-agent { max-width: 820px; margin: 0 auto; padding: 0 16px; }

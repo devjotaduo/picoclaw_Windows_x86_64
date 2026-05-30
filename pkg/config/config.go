@@ -23,6 +23,11 @@ type Config struct {
 	// fallback when a model entry has no api_key of its own.
 	Credentials map[string]string `json:"credentials,omitempty"`
 
+	// ActiveAgent, when set, is the name of a named agent (from agents.json)
+	// that the default Chat and WhatsApp answer as — its prompt and model, with
+	// its name injected. Empty means the generic default assistant.
+	ActiveAgent string `json:"active_agent,omitempty"`
+
 	// path records where this config was loaded from, for Save.
 	path string
 }

@@ -12,6 +12,7 @@ const EMPTY: NamedAgent = {
 export function AgentsPage() {
 	const [agents, setAgents] = useState<NamedAgent[]>([]);
 	const [models, setModels] = useState<string[]>([]);
+	const [active, setActive] = useState<string>("");
 	const [form, setForm] = useState<NamedAgent>(EMPTY);
 	const [editing, setEditing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,18 @@ export function AgentsPage() {
 			const data = await agentsApi.list();
 			setAgents(data.agents || []);
 			setModels(data.models || []);
+			setActive(data.active || "");
+		} catch (e) {
+			setError(e instanceof Error ? e.message : String(e));
+		}
+	}
+
+	async function activate(name: string) {
+		setError(null);
+		try {
+			await agentsApi.setActive(name);
+			setMsg(name ? `"${name}" agora atende no Chat e no WhatsApp ✓` : "Voltou ao assistente padrão ✓");
+			await load();
 		} catch (e) {
 			setError(e instanceof Error ? e.message : String(e));
 		}
@@ -108,12 +121,36 @@ export function AgentsPage() {
 									className={form.name === a.name && editing ? "agent-item active" : "agent-item"}
 									onClick={() => edit(a)}
 								>
-									<div className="agent-item-name">{a.name}</div>
+									<div className="agent-item-name">
+										{a.name}
+										{active === a.name && <span className="agent-active-badge">★ ativo</span>}
+									</div>
 									<div className="agent-item-desc muted">
 										{(a.description || a.system_prompt || "").slice(0, 60) || "—"}
 									</div>
 									<div className="agent-item-foot">
 										<span className="agent-item-tag">{a.model || "modelo padrão"}</span>
+										{active === a.name ? (
+											<button
+												className="link"
+												onClick={(e) => {
+													e.stopPropagation();
+													void activate("");
+												}}
+											>
+												desativar
+											</button>
+										) : (
+											<button
+												className="link"
+												onClick={(e) => {
+													e.stopPropagation();
+													void activate(a.name);
+												}}
+											>
+												usar no Chat+WhatsApp
+											</button>
+										)}
 										<a
 											className="agent-open-link"
 											href={`/a/${encodeURIComponent(a.name)}`}

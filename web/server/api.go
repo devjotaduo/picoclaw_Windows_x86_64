@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"picoclaw/pkg/agent"
 	"picoclaw/pkg/config"
 )
 
@@ -196,17 +195,14 @@ func (l *Launcher) handleCredentialByName(w http.ResponseWriter, r *http.Request
 	l.persistAndReload(w)
 }
 
-// persistAndReload saves the config and rebuilds the agent. The caller must
-// hold l.mu (write lock). It writes the HTTP response.
+// persistAndReload saves the config and rebuilds the agent (honouring the
+// active named agent). The caller must hold l.mu (write lock). It writes the
+// HTTP response.
 func (l *Launcher) persistAndReload(w http.ResponseWriter) {
 	if err := l.cfg.Save(); err != nil {
 		writeErr(w, http.StatusInternalServerError, "save: "+err.Error())
 		return
 	}
-	if ag, err := agent.New(l.cfg); err == nil {
-		l.agent = ag
-	} else {
-		l.agent = nil
-	}
+	l.reloadAgent()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

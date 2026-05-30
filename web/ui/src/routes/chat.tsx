@@ -1,10 +1,20 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useChatStore } from '../stores/chat'
+import { agentsApi } from '../api/agents'
 
 export function ChatPage() {
   const { messages, sending, error, send } = useChatStore()
   const [input, setInput] = useState('')
+  // Label assistant replies with the active agent's name, when one is set.
+  const [assistant, setAssistant] = useState('PicoClaw')
   const endRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    agentsApi
+      .list()
+      .then((d) => setAssistant(d.active || 'PicoClaw'))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -26,7 +36,7 @@ export function ChatPage() {
         )}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.role}`}>
-            <div className="role">{m.role === 'user' ? 'You' : 'PicoClaw'}</div>
+            <div className="role">{m.role === 'user' ? 'You' : assistant}</div>
             {m.tools.map((t, i) => (
               <div key={i} className="toolcall">
                 <code>{t.name}</code> <span className="muted">{t.args}</span>
