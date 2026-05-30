@@ -8,6 +8,7 @@ import { AppShell } from './components/AppShell'
 import { ChatPage } from './routes/chat'
 import { AgentsPage } from './routes/agents'
 import { AgentChatPage } from './routes/agent-chat'
+import { WhatsAppPage } from './routes/whatsapp'
 import { ModelsPage } from './routes/models'
 import { CredentialsPage } from './routes/credentials'
 
@@ -37,6 +38,12 @@ const agentChatRoute = createRoute({
   component: AgentChatPage,
 })
 
+const whatsappRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/whatsapp',
+  component: WhatsAppPage,
+})
+
 const modelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/models',
@@ -53,6 +60,7 @@ const routeTree = rootRoute.addChildren([
   chatRoute,
   agentsRoute,
   agentChatRoute,
+  whatsappRoute,
   modelsRoute,
   credentialsRoute,
 ])

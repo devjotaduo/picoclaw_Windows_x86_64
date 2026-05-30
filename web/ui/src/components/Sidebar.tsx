@@ -9,6 +9,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/', label: 'Chat' },
   { to: '/agents', label: 'Agentes' },
+  { to: '/whatsapp', label: 'WhatsApp' },
   { to: '/models', label: 'Models', group: 'Models' },
   { to: '/credentials', label: 'Credentials', group: 'Models' },
 ]

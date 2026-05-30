@@ -24,6 +24,7 @@ import (
 
 	"picoclaw/pkg/agent"
 	"picoclaw/pkg/config"
+	"picoclaw/pkg/whatsapp"
 )
 
 const cookieName = "picoclaw_session"
@@ -47,6 +48,10 @@ type Launcher struct {
 	auth    authStore
 	secret  []byte
 	authDir string
+
+	// wa is the optional WhatsApp connection (whatsmeow). nil when its session
+	// store can't be opened; the launcher still runs without WhatsApp.
+	wa *whatsapp.Manager
 }
 
 // authStore is the persisted password record.
@@ -79,7 +84,33 @@ func New(addr string, public bool, cfg *config.Config) (*Launcher, error) {
 	if err := l.loadAuth(); err != nil {
 		return nil, err
 	}
+	// Best-effort WhatsApp manager (whatsmeow). A failure to open the session
+	// store must not block startup; WhatsApp simply stays unavailable.
+	if mgr, err := whatsapp.New(context.Background(), filepath.Join(l.authDir, "whatsapp.db"), l.agentReply); err == nil {
+		l.wa = mgr
+	} else {
+		log.Printf("whatsapp: disabled (%v)", err)
+	}
 	return l, nil
+}
+
+// agentReply runs the current default agent against an inbound message and
+// returns its final text (empty to stay silent) — the bridge from a channel
+// such as WhatsApp to the agent.
+func (l *Launcher) agentReply(ctx context.Context, text string) string {
+	l.mu.RLock()
+	ag := l.agent
+	l.mu.RUnlock()
+	if ag == nil {
+		return ""
+	}
+	run := *ag
+	run.Observer = nil
+	out, err := run.Run(ctx, text)
+	if err != nil {
+		return ""
+	}
+	return out
 }
 
 func (l *Launcher) authPath() string { return filepath.Join(l.authDir, ".launcher.json") }
@@ -135,6 +166,9 @@ func (l *Launcher) Run(ctx context.Context) error {
 	}
 	go func() {
 		<-ctx.Done()
+		if l.wa != nil {
+			l.wa.Close()
+		}
 		sh, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(sh)
@@ -143,6 +177,14 @@ func (l *Launcher) Run(ctx context.Context) error {
 	// Start the cron scheduler for the current agent, if any.
 	if l.agent != nil {
 		go func() { _ = l.agent.Scheduler().Run(ctx) }()
+	}
+
+	// Reconnect WhatsApp automatically when a paired session already exists
+	// (e.g. after a redeploy); a fresh pairing is started on demand from the UI.
+	if l.wa != nil {
+		if _, _, registered := l.wa.Status(); registered {
+			go func() { _ = l.wa.Connect(context.Background()) }()
+		}
 	}
 
 	scheme := "http"
@@ -218,6 +260,9 @@ func (l *Launcher) routes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/agents", l.requireAuth(l.handleAgents))
 	mux.HandleFunc("/api/agents/", l.requireAuth(l.handleAgentByName))
 	mux.HandleFunc("/api/chat/stream", l.requireAuth(l.handleChatStream))
+	mux.HandleFunc("/api/whatsapp/status", l.requireAuth(l.handleWhatsAppStatus))
+	mux.HandleFunc("/api/whatsapp/connect", l.requireAuth(l.handleWhatsAppConnect))
+	mux.HandleFunc("/api/whatsapp/logout", l.requireAuth(l.handleWhatsAppLogout))
 
 	// Static SPA (catch-all).
 	mux.HandleFunc("/", l.serveUI(uiFS()))

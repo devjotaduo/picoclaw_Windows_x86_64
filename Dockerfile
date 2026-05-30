@@ -18,7 +18,7 @@ RUN pnpm build
 # --- Stage 2: compile the Go binary (embeds web/server/dist) ---
 FROM golang:1.26-alpine AS build
 WORKDIR /src
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=ui /app/web/server/dist ./web/server/dist
