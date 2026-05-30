@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 import { AppShell } from './components/AppShell'
 import { ChatPage } from './routes/chat'
+import { AgentsPage } from './routes/agents'
 import { ModelsPage } from './routes/models'
 import { CredentialsPage } from './routes/credentials'
 
@@ -23,6 +24,12 @@ const chatRoute = createRoute({
   component: ChatPage,
 })
 
+const agentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/agents',
+  component: AgentsPage,
+})
+
 const modelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/models',
@@ -35,7 +42,7 @@ const credentialsRoute = createRoute({
   component: CredentialsPage,
 })
 
-const routeTree = rootRoute.addChildren([chatRoute, modelsRoute, credentialsRoute])
+const routeTree = rootRoute.addChildren([chatRoute, agentsRoute, modelsRoute, credentialsRoute])
 
 export const router = createRouter({ routeTree })
 
