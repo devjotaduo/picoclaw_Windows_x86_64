@@ -7,6 +7,7 @@ import {
 import { AppShell } from './components/AppShell'
 import { ChatPage } from './routes/chat'
 import { AgentsPage } from './routes/agents'
+import { AgentChatPage } from './routes/agent-chat'
 import { ModelsPage } from './routes/models'
 import { CredentialsPage } from './routes/credentials'
 
@@ -30,6 +31,12 @@ const agentsRoute = createRoute({
   component: AgentsPage,
 })
 
+const agentChatRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/a/$name',
+  component: AgentChatPage,
+})
+
 const modelsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/models',
@@ -42,7 +49,13 @@ const credentialsRoute = createRoute({
   component: CredentialsPage,
 })
 
-const routeTree = rootRoute.addChildren([chatRoute, agentsRoute, modelsRoute, credentialsRoute])
+const routeTree = rootRoute.addChildren([
+  chatRoute,
+  agentsRoute,
+  agentChatRoute,
+  modelsRoute,
+  credentialsRoute,
+])
 
 export const router = createRouter({ routeTree })
 

@@ -2,11 +2,14 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"picoclaw/pkg/agent"
 )
 
 // NamedAgent is a user-defined agent ("template"): a name plus its response
@@ -51,6 +54,57 @@ func (l *Launcher) saveAgents(agents []NamedAgent) error {
 		return err
 	}
 	return os.WriteFile(l.agentsPath(), data, 0o644)
+}
+
+// findAgent returns the named agent matching name (case-insensitive), or false.
+func (l *Launcher) findAgent(name string) (NamedAgent, bool) {
+	agents, err := l.loadAgents()
+	if err != nil {
+		return NamedAgent{}, false
+	}
+	for _, a := range agents {
+		if strings.EqualFold(a.Name, name) {
+			return a, true
+		}
+	}
+	return NamedAgent{}, false
+}
+
+// namedAgentPrompt prefixes the agent's response rules with an identity line so
+// it always presents and attends as its given name.
+func namedAgentPrompt(a NamedAgent) string {
+	identity := fmt.Sprintf("Seu nome é %q. Sempre se apresente e atenda como %q; nunca use outro nome nem diga que é um assistente genérico.", a.Name, a.Name)
+	rules := strings.TrimSpace(a.SystemPrompt)
+	if rules == "" {
+		return identity
+	}
+	return identity + "\n\n" + rules
+}
+
+// buildNamedAgent constructs a runnable agent for the named agent `name`: its
+// own model (or the configured default) and its response rules, prefixed with
+// an identity line so it answers as that name. Returns an error the chat
+// handler streams when the agent is missing or can't be built (e.g. no model).
+func (l *Launcher) buildNamedAgent(name string) (*agent.Agent, error) {
+	spec, ok := l.findAgent(name)
+	if !ok {
+		return nil, fmt.Errorf("agente %q não existe", name)
+	}
+	if !spec.Enabled {
+		return nil, fmt.Errorf("agente %q está desativado", name)
+	}
+	model := l.cfg.Agents.Defaults.ModelName
+	if spec.Model != "" {
+		if _, ok := l.cfg.ModelByName(spec.Model); ok {
+			model = spec.Model
+		}
+	}
+	// Shallow copy: agent.New only reads ModelList/Credentials and the defaults
+	// we override here; it never writes back to the shared config.
+	cfgCopy := *l.cfg
+	cfgCopy.Agents.Defaults.ModelName = model
+	cfgCopy.Agents.Defaults.SystemPrompt = namedAgentPrompt(spec)
+	return agent.New(&cfgCopy)
 }
 
 // handleAgents serves GET (list + form choices) and POST (create/update).
@@ -116,15 +170,32 @@ func (l *Launcher) handleAgents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAgentByName serves DELETE /api/agents/{name}.
+// handleAgentByName serves GET (public display info for the isolated agent
+// page) and DELETE /api/agents/{name}.
 func (l *Launcher) handleAgentByName(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
-		writeErr(w, http.StatusMethodNotAllowed, "DELETE only")
-		return
-	}
 	name := strings.TrimPrefix(r.URL.Path, "/api/agents/")
 	if name == "" {
 		writeErr(w, http.StatusBadRequest, "missing agent name")
+		return
+	}
+	if r.Method == http.MethodGet {
+		l.mu.RLock()
+		defer l.mu.RUnlock()
+		a, ok := l.findAgent(name)
+		if !ok {
+			writeErr(w, http.StatusNotFound, "no such agent")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"name":        a.Name,
+			"description": a.Description,
+			"model":       a.Model,
+			"enabled":     a.Enabled,
+		})
+		return
+	}
+	if r.Method != http.MethodDelete {
+		writeErr(w, http.StatusMethodNotAllowed, "GET or DELETE")
 		return
 	}
 	l.mu.Lock()

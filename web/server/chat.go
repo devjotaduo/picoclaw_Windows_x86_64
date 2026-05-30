@@ -39,6 +39,9 @@ func (l *Launcher) handleChatStream(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		Message string `json:"message"`
+		// Agent, when set, targets a named agent (the isolated agent page) so the
+		// reply comes from that agent — its own name, prompt and model.
+		Agent string `json:"agent,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Message == "" {
 		writeErr(w, http.StatusBadRequest, "missing message")
@@ -62,6 +65,18 @@ func (l *Launcher) handleChatStream(w http.ResponseWriter, r *http.Request) {
 		data, _ := json.Marshal(e)
 		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
+	}
+
+	// Targeting a named agent (isolated agent page): build it on the fly so the
+	// reply uses that agent's own name, prompt and model.
+	if body.Agent != "" {
+		named, err := l.buildNamedAgent(body.Agent)
+		if err != nil {
+			send(chatEvent{Type: "error", Text: err.Error()})
+			send(chatEvent{Type: "done"})
+			return
+		}
+		ag = named
 	}
 
 	if ag == nil {

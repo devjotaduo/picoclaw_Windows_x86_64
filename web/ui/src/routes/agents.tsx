@@ -112,7 +112,18 @@ export function AgentsPage() {
 									<div className="agent-item-desc muted">
 										{(a.description || a.system_prompt || "").slice(0, 60) || "—"}
 									</div>
-									<div className="agent-item-tag">{a.model || "modelo padrão"}</div>
+									<div className="agent-item-foot">
+										<span className="agent-item-tag">{a.model || "modelo padrão"}</span>
+										<a
+											className="agent-open-link"
+											href={`/a/${encodeURIComponent(a.name)}`}
+											target="_blank"
+											rel="noreferrer"
+											onClick={(e) => e.stopPropagation()}
+										>
+											abrir página ↗
+										</a>
+									</div>
 								</li>
 							))}
 						</ul>
