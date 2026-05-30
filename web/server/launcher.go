@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,11 +33,13 @@ type Launcher struct {
 	addr   string
 	public bool
 
-	// corsOrigin, when set (PICOCLAW_CORS_ORIGIN), enables CORS for that exact
-	// origin and switches the session cookie to SameSite=None;Secure so a
-	// frontend hosted on a different domain (e.g. Vercel) can authenticate.
-	corsOrigin string
-	crossSite  bool
+	// corsOrigins, when set (PICOCLAW_CORS_ORIGIN, comma-separated), enables
+	// credentialed CORS for those exact origins and switches the session cookie
+	// to SameSite=None;Secure so a frontend hosted on a different domain
+	// (e.g. Vercel or a custom domain) can authenticate. Multiple origins let a
+	// deployment migrate domains without downtime.
+	corsOrigins []string
+	crossSite   bool
 
 	mu      sync.RWMutex
 	cfg     *config.Config
@@ -63,15 +66,15 @@ func New(addr string, public bool, cfg *config.Config) (*Launcher, error) {
 		ag = nil
 	}
 	authDir := cfg.Workspace
-	corsOrigin := os.Getenv("PICOCLAW_CORS_ORIGIN")
+	corsOrigins := parseOrigins(os.Getenv("PICOCLAW_CORS_ORIGIN"))
 	l := &Launcher{
-		addr:       addr,
-		public:     public,
-		corsOrigin: corsOrigin,
-		crossSite:  corsOrigin != "",
-		cfg:        cfg,
-		agent:      ag,
-		authDir:    authDir,
+		addr:        addr,
+		public:      public,
+		corsOrigins: corsOrigins,
+		crossSite:   len(corsOrigins) > 0,
+		cfg:         cfg,
+		agent:       ag,
+		authDir:     authDir,
 	}
 	if err := l.loadAuth(); err != nil {
 		return nil, err
@@ -155,8 +158,8 @@ func (l *Launcher) Run(ctx context.Context) error {
 func (l *Launcher) withSecurity(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if l.corsOrigin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", l.corsOrigin)
+		if origin := l.allowedOrigin(r.Header.Get("Origin")); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Add("Vary", "Origin")
 			if r.Method == http.MethodOptions {
@@ -169,6 +172,34 @@ func (l *Launcher) withSecurity(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// parseOrigins splits PICOCLAW_CORS_ORIGIN (comma-separated) into trimmed,
+// non-empty origins.
+func parseOrigins(v string) []string {
+	var out []string
+	for _, o := range strings.Split(v, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			out = append(out, o)
+		}
+	}
+	return out
+}
+
+// allowedOrigin returns the Access-Control-Allow-Origin value for a request
+// carrying the given Origin header: the request origin when it is one of the
+// configured origins, otherwise the first configured origin (a deterministic
+// fallback). It returns "" when no origins are configured (CORS disabled).
+func (l *Launcher) allowedOrigin(reqOrigin string) string {
+	if len(l.corsOrigins) == 0 {
+		return ""
+	}
+	for _, o := range l.corsOrigins {
+		if o == reqOrigin {
+			return o
+		}
+	}
+	return l.corsOrigins[0]
 }
 
 func (l *Launcher) routes(mux *http.ServeMux) {
