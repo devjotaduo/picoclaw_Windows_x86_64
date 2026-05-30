@@ -1,4 +1,7 @@
-// Thin fetch wrapper. All requests are same-origin and carry the session cookie.
+// Thin fetch wrapper. Requests carry the session cookie (same-origin locally,
+// or `include` when VITE_API_BASE points at a cross-origin backend).
+
+import { apiUrl, API_CREDENTIALS } from './base'
 
 export class ApiError extends Error {
   status: number
@@ -9,9 +12,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method,
-    credentials: 'same-origin',
+    credentials: API_CREDENTIALS,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   })

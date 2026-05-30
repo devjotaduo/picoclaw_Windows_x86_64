@@ -22,15 +22,18 @@ export function isAuthed(req: Request): boolean {
 }
 
 export function setSession(res: Response): void {
+  const crossSite = env.corsOrigin !== ''
   res.cookie(COOKIE, sign(PAYLOAD), {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: crossSite ? 'none' : 'lax',
+    secure: crossSite,
     maxAge: 7 * 24 * 3600 * 1000,
   })
 }
 
 export function clearSession(res: Response): void {
-  res.clearCookie(COOKIE)
+  const crossSite = env.corsOrigin !== ''
+  res.clearCookie(COOKIE, { sameSite: crossSite ? 'none' : 'lax', secure: crossSite })
 }
 
 export function checkPassword(password: string): boolean {

@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "workspace": "/data",
+  "model_list": [],
+  "agents": { "defaults": { "max_turns": 12 } },
+  "channels": { "telegram": { "enabled": false, "token": "" } },
+  "gateway": { "host": "127.0.0.1", "port": 18790 }
+}

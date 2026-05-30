@@ -32,6 +32,12 @@ type Launcher struct {
 	addr   string
 	public bool
 
+	// corsOrigin, when set (PICOCLAW_CORS_ORIGIN), enables CORS for that exact
+	// origin and switches the session cookie to SameSite=None;Secure so a
+	// frontend hosted on a different domain (e.g. Vercel) can authenticate.
+	corsOrigin string
+	crossSite  bool
+
 	mu      sync.RWMutex
 	cfg     *config.Config
 	agent   *agent.Agent
@@ -57,12 +63,15 @@ func New(addr string, public bool, cfg *config.Config) (*Launcher, error) {
 		ag = nil
 	}
 	authDir := cfg.Workspace
+	corsOrigin := os.Getenv("PICOCLAW_CORS_ORIGIN")
 	l := &Launcher{
-		addr:    addr,
-		public:  public,
-		cfg:     cfg,
-		agent:   ag,
-		authDir: authDir,
+		addr:       addr,
+		public:     public,
+		corsOrigin: corsOrigin,
+		crossSite:  corsOrigin != "",
+		cfg:        cfg,
+		agent:      ag,
+		authDir:    authDir,
 	}
 	if err := l.loadAuth(); err != nil {
 		return nil, err
@@ -80,8 +89,13 @@ func (l *Launcher) loadAuth() error {
 	if err == nil {
 		_ = json.Unmarshal(data, &l.auth)
 	}
-	// A process-lifetime secret for signing cookies. Rotating it on restart
-	// simply invalidates existing sessions, which is acceptable.
+	// A secret for signing cookies. In production set PICOCLAW_SECRET so
+	// sessions survive restarts/redeploys; otherwise a random per-process
+	// secret is used and rotating it on restart invalidates existing sessions.
+	if s := os.Getenv("PICOCLAW_SECRET"); s != "" {
+		l.secret = []byte(s)
+		return nil
+	}
 	l.secret = make([]byte, 32)
 	if _, err := rand.Read(l.secret); err != nil {
 		return err
@@ -136,10 +150,23 @@ func (l *Launcher) Run(ctx context.Context) error {
 	return nil
 }
 
-// withSecurity applies a permissive-for-loopback CORS and basic headers.
+// withSecurity sets basic headers and, when PICOCLAW_CORS_ORIGIN is set,
+// credentialed CORS for that origin (handling preflight requests).
 func (l *Launcher) withSecurity(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		if l.corsOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", l.corsOrigin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Add("Vary", "Origin")
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Access-Control-Max-Age", "86400")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -234,13 +261,18 @@ func (l *Launcher) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (l *Launcher) handleLogout(w http.ResponseWriter, _ *http.Request) {
-	http.SetCookie(w, &http.Cookie{
+	clear := &http.Cookie{
 		Name:     cookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-	})
+	}
+	if l.crossSite {
+		clear.SameSite = http.SameSiteNoneMode
+		clear.Secure = true
+	}
+	http.SetCookie(w, clear)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -248,14 +280,20 @@ func (l *Launcher) handleLogout(w http.ResponseWriter, _ *http.Request) {
 
 func (l *Launcher) setSession(w http.ResponseWriter) {
 	token := l.signToken("authed")
-	http.SetCookie(w, &http.Cookie{
+	c := &http.Cookie{
 		Name:     cookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   7 * 24 * 3600,
-	})
+	}
+	if l.crossSite {
+		// Cross-origin frontend (e.g. Vercel) requires SameSite=None;Secure.
+		c.SameSite = http.SameSiteNoneMode
+		c.Secure = true
+	}
+	http.SetCookie(w, c)
 }
 
 func (l *Launcher) signToken(payload string) string {

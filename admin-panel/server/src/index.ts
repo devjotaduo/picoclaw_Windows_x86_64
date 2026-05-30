@@ -8,6 +8,24 @@ const app = express()
 app.use(express.json())
 app.use(cookieParser())
 
+// Credentialed CORS for a cross-origin frontend (e.g. Vercel), gated on
+// CORS_ORIGIN so local same-origin dev is unaffected.
+if (env.corsOrigin) {
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', env.corsOrigin)
+    res.header('Access-Control-Allow-Credentials', 'true')
+    res.header('Vary', 'Origin')
+    if (req.method === 'OPTIONS') {
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+      res.header('Access-Control-Allow-Headers', 'Content-Type')
+      res.header('Access-Control-Max-Age', '86400')
+      res.sendStatus(204)
+      return
+    }
+    next()
+  })
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' })
 })

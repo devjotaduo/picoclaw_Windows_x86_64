@@ -2,6 +2,8 @@
 // (tool calls, results, final assistant text) as `data:` lines; EventSource is
 // GET-only, so we read the POST response body as a stream ourselves.
 
+import { apiUrl, API_CREDENTIALS } from './base'
+
 export interface ChatEvent {
   type: 'tool_call' | 'tool_result' | 'assistant' | 'done' | 'error'
   name?: string
@@ -15,9 +17,9 @@ export async function streamChat(
   onEvent: (e: ChatEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch('/api/chat/stream', {
+  const res = await fetch(apiUrl('/api/chat/stream'), {
     method: 'POST',
-    credentials: 'same-origin',
+    credentials: API_CREDENTIALS,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message }),
     signal,

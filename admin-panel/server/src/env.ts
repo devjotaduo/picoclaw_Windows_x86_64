@@ -27,4 +27,7 @@ export const env = {
   defaultModel: process.env.DEFAULT_MODEL || 'openrouter/openai/gpt-4o-mini',
   workspacesRoot: process.env.WORKSPACES_ROOT || './data/workspaces',
   dataDir: process.env.DATA_DIR || './data',
+  // When CORS_ORIGIN is set (e.g. the Vercel frontend URL), enable credentialed
+  // CORS for that origin and switch the session cookie to SameSite=None;Secure.
+  corsOrigin: process.env.CORS_ORIGIN || '',
 }
