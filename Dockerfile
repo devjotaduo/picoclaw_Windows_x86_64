@@ -26,13 +26,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/picocla
 
 # --- Stage 3: runtime ---
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates tzdata && adduser -D -u 10001 app
+RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=build /out/picoclaw /usr/local/bin/picoclaw
 COPY deploy/config.template.json /app/config.template.json
 COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh && mkdir -p /data && chown app /data
-USER app
+RUN chmod +x /usr/local/bin/entrypoint.sh && mkdir -p /data
+# Runs as root: Railway/Fly mount persistent volumes at /data owned by root,
+# so a non-root user could not write the seeded config there.
 ENV PICOCLAW_DATA=/data PORT=18800
 EXPOSE 18800
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
