@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "workspace": "./run/workspace",
+  "model_list": [
+    {"name":"openrouter/openai/gpt-4o","base_url":"https://openrouter.ai/api/v1","api_key":"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"},
+    {"name":"openrouter/openai/gpt-4o-mini","base_url":"https://openrouter.ai/api/v1","api_key":"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"},
+    {"name":"openrouter/anthropic/claude-sonnet-4.5","base_url":"https://openrouter.ai/api/v1","api_key":"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"},
+    {"name":"openrouter/google/gemini-2.5-flash","base_url":"https://openrouter.ai/api/v1","api_key":"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"},
+    {"name":"openrouter/qwen/qwen3-235b-a22b-2507","base_url":"https://openrouter.ai/api/v1","api_key":"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"}
+  ],
+  "agents": { "defaults": { "model_name": "openrouter/openai/gpt-4o", "max_turns": 12 } },
+  "channels": { "telegram": { "enabled": false, "token": "" } },
+  "gateway": { "host": "127.0.0.1", "port": 18790 }
+}

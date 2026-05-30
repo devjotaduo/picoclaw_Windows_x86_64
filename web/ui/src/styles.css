@@ -146,3 +146,24 @@ input {
   border-top: 1px solid var(--border);
 }
 .composer input { flex: 1; }
+
+/* --- Agents tab --- */
+.agents-layout { display: flex; gap: 16px; align-items: flex-start; }
+.agents-list-card { width: 300px; flex-shrink: 0; }
+.agents-list-head { display: flex; justify-content: space-between; align-items: center; }
+.agents-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.agent-item { padding: 10px 12px; border: 1px solid var(--border, #2b313c); border-radius: 8px;
+  margin-bottom: 8px; cursor: pointer; }
+.agent-item:hover { border-color: #3e5db9; }
+.agent-item.active { border-color: #3e5db9; background: rgba(62,93,185,0.12); }
+.agent-item-name { font-weight: 600; }
+.agent-item-desc { font-size: 12px; }
+.agent-item-tag { font-size: 11px; color: #3e5db9; margin-top: 2px; }
+.agents-form { flex: 1; }
+.agents-form label { display: block; margin: 12px 0 4px; }
+.agents-form input, .agents-form textarea, .agents-form select { width: 100%; }
+.agents-form textarea { resize: vertical; font: inherit; }
+.agents-form-row { display: flex; gap: 14px; }
+.agents-form-row > label { flex: 1; }
+.agents-form-actions { display: flex; gap: 14px; align-items: center; margin-top: 16px; }
+.link.danger { color: #e57; }

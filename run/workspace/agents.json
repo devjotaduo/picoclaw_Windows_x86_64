@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Atendimento",
+    "description": "Suporte cordial",
+    "system_prompt": "Voce e um atendente cordial. Responda em portugues, claro e objetivo.",
+    "model": "openrouter/openai/gpt-4o",
+    "temperature": 0.5,
+    "enabled": true
+  }
+]

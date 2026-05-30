@@ -157,6 +157,8 @@ func (l *Launcher) routes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/models/", l.requireAuth(l.handleModelByName))
 	mux.HandleFunc("/api/credentials", l.requireAuth(l.handleCredentials))
 	mux.HandleFunc("/api/credentials/", l.requireAuth(l.handleCredentialByName))
+	mux.HandleFunc("/api/agents", l.requireAuth(l.handleAgents))
+	mux.HandleFunc("/api/agents/", l.requireAuth(l.handleAgentByName))
 	mux.HandleFunc("/api/chat/stream", l.requireAuth(l.handleChatStream))
 
 	// Static SPA (catch-all).
