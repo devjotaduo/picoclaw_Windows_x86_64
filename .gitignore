@@ -1,0 +1,6 @@
+﻿web/ui/node_modules/
+web/server/dist/assets/
+bin/
+*.exe
+_dev.log
+_dev.err
